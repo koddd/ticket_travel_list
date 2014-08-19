@@ -1,0 +1,42 @@
+body {
+    padding-top: 40px;
+    padding-bottom: 40px;
+    padding-left: 200px;
+    padding-right: 200px;
+    font-family: "verdana";
+    font-size: 12px;
+    color: #333;
+}
+
+.monitor {
+    background: #ECECEC;
+    border: #999 solid 1px;
+    padding: 20px;
+}
+
+input, textarea, option {
+    font-size: 12px;
+    font-family: 'verdana';
+    padding: 5px;
+}
+
+.input_text {
+    width: 200px;
+}
+
+.form_row label {
+    display: block;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.form_row span.help-block {
+    display: block;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    color: #999;
+}
+
+.form_row {
+    margin-bottom: 10px;
+}
