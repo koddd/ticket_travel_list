@@ -8,6 +8,10 @@ body {
     color: #333;
 }
 
+a {
+    color: #0000FF;
+}
+
 .monitor {
     background: #ECECEC;
     border: #999 solid 1px;
@@ -39,4 +43,31 @@ input, textarea, option {
 
 .form_row {
     margin-bottom: 10px;
+}
+
+.result_row {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    border-top: #FFF solid 1px;
+}
+
+.result_row:first-child {
+    padding-top: 0px;
+    border-top: none;
+}
+
+.result_row .date {
+    display: block;
+}
+
+.result_row .name {
+    display: block;
+}
+
+.result_row .links {
+    padding-top: 10px;
+}
+
+.result_row .links a {
+    margin-right: 15px;
 }

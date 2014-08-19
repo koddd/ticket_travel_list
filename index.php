@@ -4,15 +4,17 @@ class travel_list {
     public $save_path;
     public $filename;
     public $group;
-    public $modified;
+    public $modifyed;
     public $xml;
-    public $formerror;
+    public $before;
+    public $after;
 
     public function __construct($filename = '', $group = 'ticket') {
-        $this->modified = false;
-        $this->save_path = './';
+        $this->modifyed = false;
+        $this->save_path = $_SERVER['DOCUMENT_ROOT'].'/testing_task/';
         $this->group = $group;
-        $this->formerror = array();
+        $this->before = '';
+        $this->after = '';
 
         if(strlen($filename) > 0) {
             $this->filename = $filename;
@@ -24,18 +26,11 @@ class travel_list {
     }
 
     public function __destruct() {
-        if($this->modified) {
+        if($this->modifyed) {
             if($this->save()) {
-                $this->modified = false;
-                // done
+                $this->modifyed = false;
             }
         }
-
-        unset($this->form_error);
-    }
-
-    public function init() {
-
     }
 
     public function open() {
@@ -57,42 +52,71 @@ class travel_list {
     }
 
     public function save() {
-        try {
-            if(file_put_contents($this->filename, $this->xml->asXML())) {
-                return true;
-            } else {
-                throw new Exception("Ошибка записи в файл ".$this->filename);
+
+        if($this->modifyed) {
+            try {
+                if(file_put_contents($this->filename, $this->xml->asXML(), LOCK_EX)) {
+                    return true;
+                } else {
+                    throw new Exception("Ошибка записи в файл ".$this->filename);
+                }
+            } catch (Exception $e) {
+                // save to log
+                // display error_log
+                echo $e->getMessage()." на строке ".$e->getLine();
             }
-        } catch (Exception $e) {
-            // save to log
-            // display error_log
-            echo $e->getMessage()." на строке ".$e->getLine();
         }
 
         return FALSE;
     }
 
-    public function getall($string = '') {
-        $list = $this->xml->xpath('//root/ticket');
-        $result = '';
+    public function getall() {
+        $args = func_get_args();
+        $list = $this->xml->xpath('//root/'.$this->group);
 
-        foreach($list as $item) {
-            if(preg_match('/\w+/', $string)) {
-                $result .= sprintf($string, $item->value);
-            } else {
-                $result .= $item->value;
+        if(count($args) > 2) {
+            $query = array_shift($args);
+            // echo "<pre>".print_r($query, true)."</pre>";
+            // echo "<pre>".print_r($args, true)."</pre>";
+
+            foreach($list as $item) {
+                $result = array();
+
+                foreach($args as $arg) {
+                    if(isset($item->{$arg})) {
+                        $result[$arg] = (string) $item->{$arg};
+                        // $result[] = settype(, "string");
+                    }
+                }
+
+                array_unshift($result, $query);
+
+                // echo "<pre>".print_r($result, true)."</pre>";
+                // echo "<pre>".print_r($query, true)."</pre>";
+
+                echo call_user_func_array('sprintf', $result);
             }
         }
     }
 
+    public function display_wraper($before = '', $after = '') {
+        $this->before = $before;
+        $this->after = $after;
+    }
+
     function addItem($data = array()) {
         if(count($data)) {
-            $item_set = $this->xml->root->addChild($this->group);
+            $item_set = $this->xml->addChild($this->group);
+            $item_set->addChild("id", uniqid());
 
             foreach($data as $key => $value) {
-                $item_set->addChild($key, $value);
-                $this->modifyed = true;
+                if(!preg_match('/^(id)$/', $key)) {
+                    $item_set->addChild($key, $value);
+                    $this->modifyed = true;
+                }
             }
+
+            // echo $this->xml->asXML();
         }
     }
 
@@ -139,6 +163,7 @@ class travel_list {
 
 class form_validate {
     public $formerror;
+    public $validation_rules;
     public $display_before;
     public $display_after;
 
@@ -146,29 +171,36 @@ class form_validate {
         $this->formerror = array();
         $this->display_before = '';
         $this->display_after = '';
+        $this->validation_rules = array();
     }
 
-    public function error_display($before = 'text', $after = 'text1') {
+    public function error_display($before = '', $after = '') {
         $this->display_before = $before;
         $this->display_after = $after;
     }
 
-    function form_validate($rules = array()) {
+    function form_init_rules($rules = array()) {
+        $this->validation_rules = $rules;
+    }
+
+    function validate() {
         $formerror = '';
 
-        if(count($rules)) {
+        if(count($this->validation_rules)) {
             try {
-                if(count($rules) == count($_POST)) {
-                    foreach($rules as $rule) {
+                if(count($this->validation_rules) == count($_POST)) {
+                    foreach($this->validation_rules as $rule) {
                         $rule = (object) $rule;
                         if(isset($_POST[$rule->name])) {
                             if(!preg_match($rule->rule, $_POST[$rule->name])) {
-                                $formerror[$rule->name] = $rule->error;
+                                $this->formerror[$rule->name] = $rule->error;
                             }
                         }
                     }
 
-                    return $formerror;
+                    if(!count($this->formerror)) {
+                        return TRUE;
+                    }
                 } else {
                     throw new Exception("Ошибка конфига валидации, неправильное число полей формы");
                 }
@@ -178,14 +210,16 @@ class form_validate {
                 echo $e->getMessage()." на строке ".$e->getLine();
             }
         }
+
+        return FALSE;
     }
 
     function form_error($field_name = '') {
-        if(isset($formerror) && count($formerror)) {
+        if(count($this->formerror)) {
             if(preg_match('/\w+/', $field_name)) {
-                foreach($formerror as $name => $error) {
+                foreach($this->formerror as $name => $error) {
                     if($name == $field_name) {
-                        return $error;
+                        return $this->display_before.$error.$this->display_after;
                     }
                 }
             }
@@ -210,7 +244,9 @@ class form_validate {
 
 
 
-
+/**
+ * Load validation class
+ */
 
 $form_validation = new form_validate();
 $form_validation->error_display("<div class=\"error\">", "</div>");
@@ -238,66 +274,63 @@ $validate_rules = array(
     )
 );
 
-$form_validation->validate();
+$form_validation->form_init_rules($validate_rules);
 
-echo "<pre>".print_r($form_validation, true)."</pre>";
+// echo "<pre>".print_r($form_validation, true)."</pre>";
+
+/**
+ * Load travel list class
+ */
 
 $travellist = new travel_list();
-$getlist = '';
+$travellist->display_wraper("<div>", "</div>");
+
+// echo "<pre>".print_r($travellist, true)."</pre>";
+
+
+if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
+
+}
+
 
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // validate form
-    $validate_rules = array(
-        array(
-            "name" => "date",
-            "rule" => "/\d{2}-\d{2}-[1-2]\d{3}/",
-            "error" => "wrong date"
-        ),
-        array(
-            "name" => "name",
-            "rule" => "/\w{3,24}/",
-            "error" => "wrong name"
-        ),
-        array(
-            "name" => "soname",
-            "rule" => "/\w{3,24}/",
-            "error" => "wrong soname"
-        ),
-        array(
-            "name" => "quantity",
-            "rule" => "/\d+/",
-            "error" => "wrong quantity"
-        )
-    );
-    // $this->validate($validate_rules);
+    if($form_validation->validate()) {
+
+        if(isset($_GET['action'])) {
+            switch ($_GET['action']) {
+                case "add":
+                    $item = array(
+                        "date" => $_POST['date'],
+                        "name" => $_POST['name'],
+                        "soname" => $_POST['soname'],
+                        "quantity" => $_POST['quantity']
+                    );
+
+                    $travellist->addItem($item);
+                    break;
+                case "update":
+                    $item_update = array(
+                        "date" => $_POST['date'],
+                        "name" => $_POST['name'],
+                        "soname" => $_POST['soname'],
+                        "quantity" => $_POST['quantity']
+                    );
+
+                    $travellist->updEntry($id, $item_update);
+                    break;
+                case "delete":
+                    $travellist->delete($id);
+                    break;
+            }
+        }
+    } else {
+
+    }
     //
     // ==> then
     //
-
-    if(isset($_GET['action'])) {
-        switch ($action) {
-            case "add":
-
-                $item = array(
-                    "date" => $_POST['date'],
-                    "date" => $_POST['date'],
-                );
-
-                $travellist->addItem();
-                break;
-            case "update":
-                $travellist->update();
-                break;
-            case "delete":
-                $travellist->delete();
-                break;
-        }
-    }
-
-    if($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
-
-    }
 } else {
     $getlist = $travellist->getall();
 }
@@ -312,7 +345,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 <body>
 
-<h1>Список продуктов</h1>
+<h1>Список покупок для путешествий</h1>
 
 <script type="text/javascript">
 
@@ -333,7 +366,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 </script>
 
 <div class="monitor" id="travelmonitor">
-    <?php echo $getlist; ?>
+    <?php echo $travellist->getall("<div class='result_row'><span class='date'>Дата: %s</span> <div class='name'>ФИО: %s %s</div> <div>Количество мест: => %s</div><div class='links'><a href='./?action=edit&id=%s'>изменить</a> <a href='./?action=del&id=%5\$s'>удалить</a></div></div>", "date", "name", "soname", "quantity", "id"); ?>
 </div>
 
 
@@ -342,18 +375,18 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <div class="form_row">
         <label>Дата</label>
-        <input type="text" name="date" value="<?php form_value('date', date('d-m-Y')); ?>" maxlength="32" class="input_text" />
-        <?php form_error('date'); ?>
+        <input type="text" name="date" value="<?php $form_validation->form_value('date', date('d-m-Y')); ?>" maxlength="32" class="input_text" />
+        <?php $form_validation->form_error('date'); ?>
     </div>
     <div class="form_row">
         <label>Имя</label>
-        <input type="text" name="name" value="" maxlength="32" class="input_text" />
-        <?php form_error('name'); ?>
+        <input type="text" name="name" value="<?php $form_validation->form_value('name'); ?>" maxlength="32" class="input_text" />
+        <?php $form_validation->form_error('name'); ?>
     </div>
     <div class="form_row">
         <label>Фамилия</label>
-        <input type="text" name="soname" value="" maxlength="32" class="input_text" />
-        <?php form_error('soname'); ?>
+        <input type="text" name="soname" value="<?php $form_validation->form_value('soname'); ?>" maxlength="32" class="input_text" />
+        <?php $form_validation->form_error('soname'); ?>
     </div>
     <div class="form_row">
         <label>Количество мест</label>
@@ -363,8 +396,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             <option>3</option>
             <option>4</option>
         </select>
-        <?php form_error('quantity'); ?>
-        <span class="help-block">Example block-level help text here.</span>
+        <?php $form_validation->form_error('quantity'); ?>
     </div>
     <div class="form_row">
         <input type="submit" value="Отправить">
