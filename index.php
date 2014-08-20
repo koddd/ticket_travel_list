@@ -169,7 +169,6 @@ class travel_list {
 }
 
 /*****************************************************************************/
-
 /* Validation options  */
 
 class form_validate {
@@ -260,7 +259,7 @@ $travellist = new travel_list();
 $travellist->display_wraper("<div>", "</div>");
 
 
-
+/*****************************************************************************/
 
 if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
     if(isset($_GET['action'])) {
@@ -290,17 +289,23 @@ if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUE
                         "result_html" => $result_string
                     );
                 }
-
                 echo json_encode($return_string);
-
                 break;
             case "add":
+                $item_card = array(
+                    "date" => $_GET['date'],
+                    "name" => $_GET['name'],
+                    "soname" => $_GET['soname'],
+                    "quantity" => $_GET['quantity']
+                );
+                $travellist->addItem($item_card);
                 break;
             case "edit":
+
                 break;
             case "del":
                 if(isset($_GET['id'])) {
-                    // $travellist->delEntry($_GET['id']);
+                    $travellist->delEntry($_GET['id']);
                 }
                 break;
         }
@@ -308,23 +313,6 @@ if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUE
     exit;
 }
 
-
-if(isset($_GET['action'])) {
-    echo $_GET['action']." => ".$_GET['id'];
-    switch ($_GET['action']) {
-        case "add":
-
-            break;
-        case "edit":
-
-            break;
-        case "del":
-            if(isset($_GET['id'])) {
-                // $travellist->delEntry($_GET['id']);
-            }
-            break;
-    }
-}
 
 
 $form_validation = new form_validate();
@@ -454,10 +442,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     function onSubmit(action, form_values) {
-        var params = 'action=' + action + '&date=' + form_values.date.value + '&name=' + form_values.name.value + '&surname=' + form_values.soname.value + '&quantity=' + form_values.quantity.value;
+        var params = 'action=' + action + '&date=' + form_values.date.value + '&name=' + form_values.name.value + '&soname=' + form_values.soname.value + '&quantity=' + form_values.quantity.value;
         getAjaxRequest(action, params, function(result) {
-            // var event = JSON.parse(result);
-            update_monitor(result);
+            // update_monitor(result);
         });
 
         return false;
@@ -465,6 +452,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     function update_monitor(content) {
         travelmonitor.innerHTML = content;
+        // reset_anchor();
+        init_anchor();
     }
 
     function get() {
@@ -475,6 +464,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             getAjaxRequest('get', params, function(result) {
                 var event = JSON.parse(result);
                 if(event.s == 1) {
+                    travelmonitor.setAttribute('data-id', event.size);
                     update_monitor(event.result_html);
                 }
             });
@@ -482,21 +472,24 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     function init_anchor() {
-        // console.log(travelmonitor);
         var container = travelmonitor.getElementsByClassName("result_row");
-        // console.log(container);
-
         for(var i = 0; i < container.length; i++) {
             var anchor = container[i].getElementsByClassName("links")[0].getElementsByTagName("a");
             for(var k = 0; k < anchor.length; k++) {
                 anchor[k].onclick = doAction;
-                // console.log(anchor[k]);
             }
         }
     }
 
     function doAction(event) {
-        console.log(event);
+
+        var params = event.target.href.match(/\/\?(.*)$/)[1];
+        var params_action = event.target.href.match(/action=(\w+)&/)[1];
+
+        getAjaxRequest(params_action, params, function(result) {
+            // console.log(result);
+        });
+
         return false;
     }
 
