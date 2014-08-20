@@ -95,6 +95,17 @@ class travel_list {
         return $result_string;
     }
 
+    public function getEntry($id) {
+        $node = $this->xml->xpath('//'.$this->group.'[id[text()="'.$id.'"]]');
+        $result = array();
+
+        foreach($node[0] as $name=>$item) {
+            $result[$name] = (string) $item;
+        }
+
+        return (object) $result;
+    }
+
     public function getallXML() {
         $result = $this->xml->xpath('//root/'.$this->group);
         while(list( , $node) = each($result)) {
@@ -265,7 +276,6 @@ if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUE
     if(isset($_GET['action'])) {
         switch ($_GET['action']) {
             case "get":
-                // echo $travellist->getallXML();
                 $result_string = $travellist->getall("<div class='result_row'><span class='date'>Дата: %s</span> <div class='name'>ФИО: %s %s</div> <div>Количество мест: => %s</div><div class='links'><a href='./?action=edit&id=%s'>изменить</a> <a href='./?action=del&id=%5\$s'>удалить</a></div></div>", "date", "name", "soname", "quantity", "id");
                 $current_size = $travellist->getSize();
                 $return_string = array();
@@ -301,7 +311,14 @@ if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUE
                 $travellist->addItem($item_card);
                 break;
             case "edit":
+                if(isset($_GET['id'])) {
 
+                    $return_string = array(
+                        "vars" => $travellist->getEntry($_GET['id'])
+                    );
+
+                    echo "<pre>".print_r($return_string, true)."</pre>";
+                }
                 break;
             case "del":
                 if(isset($_GET['id'])) {
@@ -487,7 +504,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         var params_action = event.target.href.match(/action=(\w+)&/)[1];
 
         getAjaxRequest(params_action, params, function(result) {
-            // console.log(result);
+            console.log(result);
         });
 
         return false;
