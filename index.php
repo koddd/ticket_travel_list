@@ -39,7 +39,7 @@ class travel_list {
                 $this->xml = simplexml_load_file($this->filename);
             } else {
                 $this->xml = new SimpleXMLElement("<root></root>");
-                echo $this->xml->asXML();
+                // echo $this->xml->asXML();
                 // throw new Exception("Отсутствует файл ".$this->filename);
             }
         } catch (Exception $e) {
@@ -52,7 +52,6 @@ class travel_list {
     }
 
     public function save() {
-
         if($this->modifyed) {
             try {
                 if(file_put_contents($this->filename, $this->xml->asXML(), LOCK_EX)) {
@@ -73,11 +72,10 @@ class travel_list {
     public function getall() {
         $args = func_get_args();
         $list = $this->xml->xpath('//root/'.$this->group);
+        $result_string = '';
 
         if(count($args) > 2) {
             $query = array_shift($args);
-            // echo "<pre>".print_r($query, true)."</pre>";
-            // echo "<pre>".print_r($args, true)."</pre>";
 
             foreach($list as $item) {
                 $result = array();
@@ -85,18 +83,25 @@ class travel_list {
                 foreach($args as $arg) {
                     if(isset($item->{$arg})) {
                         $result[$arg] = (string) $item->{$arg};
-                        // $result[] = settype(, "string");
                     }
                 }
 
                 array_unshift($result, $query);
 
-                // echo "<pre>".print_r($result, true)."</pre>";
-                // echo "<pre>".print_r($query, true)."</pre>";
-
-                echo call_user_func_array('sprintf', $result);
+                $result_string .= call_user_func_array('sprintf', $result);
             }
         }
+
+        return $result_string;
+    }
+
+    public function getallXML() {
+        $result = $this->xml->xpath('//root/'.$this->group);
+        while(list( , $node) = each($result)) {
+            echo $node->asXML();
+        }
+
+        // return $result->asXML();
     }
 
     public function display_wraper($before = '', $after = '') {
@@ -115,8 +120,6 @@ class travel_list {
                     $this->modifyed = true;
                 }
             }
-
-            // echo $this->xml->asXML();
         }
     }
 
@@ -155,6 +158,14 @@ class travel_list {
         }
     }
 
+    function getSize() {
+        if(file_exists($this->filename)) {
+            return base64_encode(filesize($this->filename));
+        }
+
+        return 0;
+    }
+
 }
 
 /*****************************************************************************/
@@ -185,29 +196,30 @@ class form_validate {
 
     function validate() {
         $formerror = '';
-
-        if(count($this->validation_rules)) {
-            try {
-                if(count($this->validation_rules) == count($_POST)) {
-                    foreach($this->validation_rules as $rule) {
-                        $rule = (object) $rule;
-                        if(isset($_POST[$rule->name])) {
-                            if(!preg_match($rule->rule, $_POST[$rule->name])) {
-                                $this->formerror[$rule->name] = $rule->error;
+        if($_SERVER['REQUEST_METHOD']) {
+            if(count($this->validation_rules)) {
+                try {
+                    if(count($this->validation_rules) == count($_POST)) {
+                        foreach($this->validation_rules as $rule) {
+                            $rule = (object) $rule;
+                            if(isset($_POST[$rule->name])) {
+                                if(!preg_match($rule->rule, $_POST[$rule->name])) {
+                                    $this->formerror[$rule->name] = $rule->error;
+                                }
                             }
                         }
-                    }
 
-                    if(!count($this->formerror)) {
-                        return TRUE;
+                        if(!count($this->formerror)) {
+                            return TRUE;
+                        }
+                    } else {
+                        throw new Exception("Ошибка конфига валидации, неправильное число полей формы");
                     }
-                } else {
-                    throw new Exception("Ошибка конфига валидации, неправильное число полей формы");
+                } catch (Exception $e) {
+                    // save to log
+                    // display error_log
+                    echo $e->getMessage()." на строке ".$e->getLine();
                 }
-            } catch (Exception $e) {
-                // save to log
-                // display error_log
-                echo $e->getMessage()." на строке ".$e->getLine();
             }
         }
 
@@ -237,46 +249,8 @@ class form_validate {
             }
         }
     }
-
 }
 
-
-
-
-
-/**
- * Load validation class
- */
-
-$form_validation = new form_validate();
-$form_validation->error_display("<div class=\"error\">", "</div>");
-
-$validate_rules = array(
-    array(
-        "name" => "date",
-        "rule" => "/\d{2}-\d{2}-[1-2]\d{3}/",
-        "error" => "wrong date"
-    ),
-    array(
-        "name" => "name",
-        "rule" => "/\w{3,24}/",
-        "error" => "wrong name"
-    ),
-    array(
-        "name" => "soname",
-        "rule" => "/\w{3,24}/",
-        "error" => "wrong soname"
-    ),
-    array(
-        "name" => "quantity",
-        "rule" => "/\d+/",
-        "error" => "wrong quantity"
-    )
-);
-
-$form_validation->form_init_rules($validate_rules);
-
-// echo "<pre>".print_r($form_validation, true)."</pre>";
 
 /**
  * Load travel list class
@@ -285,15 +259,104 @@ $form_validation->form_init_rules($validate_rules);
 $travellist = new travel_list();
 $travellist->display_wraper("<div>", "</div>");
 
-// echo "<pre>".print_r($travellist, true)."</pre>";
 
 
-if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
 
+if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+    if(isset($_GET['action'])) {
+        switch ($_GET['action']) {
+            case "get":
+                // echo $travellist->getallXML();
+                $result_string = $travellist->getall("<div class='result_row'><span class='date'>Дата: %s</span> <div class='name'>ФИО: %s %s</div> <div>Количество мест: => %s</div><div class='links'><a href='./?action=edit&id=%s'>изменить</a> <a href='./?action=del&id=%5\$s'>удалить</a></div></div>", "date", "name", "soname", "quantity", "id");
+                $current_size = $travellist->getSize();
+                $return_string = array();
+
+                if(isset($_GET['size'])) {
+                    if($_GET['size'] == $current_size) {
+                        $return_string = array(
+                            "s" => 0
+                        );
+                    } else {
+                        $return_string = array(
+                            "s" => 1, // 0 => no changes, 1 => has changes
+                            "size" => $current_size,
+                            "result_html" => $result_string
+                        );
+                    }
+                } else {
+                    $return_string = array(
+                        "s" => 1, // 0 => no changes, 1 => has changes
+                        "size" => $current_size,
+                        "result_html" => $result_string
+                    );
+                }
+
+                echo json_encode($return_string);
+
+                break;
+            case "add":
+                break;
+            case "edit":
+                break;
+            case "del":
+                if(isset($_GET['id'])) {
+                    // $travellist->delEntry($_GET['id']);
+                }
+                break;
+        }
+    }
+    exit;
 }
 
 
+if(isset($_GET['action'])) {
+    echo $_GET['action']." => ".$_GET['id'];
+    switch ($_GET['action']) {
+        case "add":
+
+            break;
+        case "edit":
+
+            break;
+        case "del":
+            if(isset($_GET['id'])) {
+                // $travellist->delEntry($_GET['id']);
+            }
+            break;
+    }
+}
+
+
+$form_validation = new form_validate();
+$form_validation->error_display("<div class=\"error\">", "</div>");
+
+
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
+
+    $validate_rules = array(
+        array(
+            "name" => "date",
+            "rule" => "/\d{2}-\d{2}-[1-2]\d{3}/",
+            "error" => "wrong date"
+        ),
+        array(
+            "name" => "name",
+            "rule" => "/\w{3,24}/",
+            "error" => "wrong name"
+        ),
+        array(
+            "name" => "soname",
+            "rule" => "/\w{3,24}/",
+            "error" => "wrong soname"
+        ),
+        array(
+            "name" => "quantity",
+            "rule" => "/\d+/",
+            "error" => "wrong quantity"
+        )
+    );
+
+    $form_validation->form_init_rules($validate_rules);
 
     // validate form
     if($form_validation->validate()) {
@@ -310,7 +373,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $travellist->addItem($item);
                     break;
-                case "update":
+                case "edit":
                     $item_update = array(
                         "date" => $_POST['date'],
                         "name" => $_POST['name'],
@@ -320,17 +383,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $travellist->updEntry($id, $item_update);
                     break;
-                case "delete":
+                case "del":
                     $travellist->delete($id);
                     break;
             }
         }
-    } else {
-
     }
-    //
-    // ==> then
-    //
 } else {
     $getlist = $travellist->getall();
 }
@@ -349,29 +407,117 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <script type="text/javascript">
 
-    function onSubmit(e) {
-        var xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("POST", 'http://developex.local/testing_task/');
+
+
+    var documentReady = (function(callback) {
+        var document_loaded = 'load';
+        if(document.loaded) {
+            callback;
+        } else {
+            if (window.addEventListener) {
+                window.addEventListener(document_loaded, callback, false);
+            } else {
+                window.attachEvent('on'+document_loaded, callback);
+            }
+        }
+    });
+
+    function getAjaxRequest(action, params, onComplete) {
+        var xmlhttp;
+        try {
+            xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+        } catch (e) {
+            try {
+                xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+            } catch (E) {
+                xmlhttp = false;
+            }
+        }
+        if (!xmlhttp && typeof XMLHttpRequest!='undefined') {
+            xmlhttp = new XMLHttpRequest();
+        }
+
+        if(params.length == 0) {
+            params = 'action='+action;
+        }
+
+        xmlhttp.open("GET", './?' + params);
+        xmlhttp.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         xmlhttp.onreadystatechange = function() {
-            if (xmlhttp.readyState == 4) {
-                xmlhttp.status,
-                    xmlhttp.getAllResponseHeaders(),
-                    xmlhttp.responseText
-                console.log(xmlhttp.responseText);
+            if(xmlhttp.readyState == 4) {
+                if (xmlhttp.status == 200) {
+                    onComplete(xmlhttp.responseText);
+                }
             }
         }
         xmlhttp.send(null);
     }
 
+    function onSubmit(action, form_values) {
+        var params = 'action=' + action + '&date=' + form_values.date.value + '&name=' + form_values.name.value + '&surname=' + form_values.soname.value + '&quantity=' + form_values.quantity.value;
+        getAjaxRequest(action, params, function(result) {
+            // var event = JSON.parse(result);
+            update_monitor(result);
+        });
+
+        return false;
+    }
+
+    function update_monitor(content) {
+        travelmonitor.innerHTML = content;
+    }
+
+    function get() {
+        intervalId = setInterval( function() {
+            var container_size = travelmonitor.getAttribute('data-id');
+            var params = 'action=get&size='+container_size;
+
+            getAjaxRequest('get', params, function(result) {
+                var event = JSON.parse(result);
+                if(event.s == 1) {
+                    update_monitor(event.result_html);
+                }
+            });
+        } , 3000);
+    }
+
+    function init_anchor() {
+        // console.log(travelmonitor);
+        var container = travelmonitor.getElementsByClassName("result_row");
+        // console.log(container);
+
+        for(var i = 0; i < container.length; i++) {
+            var anchor = container[i].getElementsByClassName("links")[0].getElementsByTagName("a");
+            for(var k = 0; k < anchor.length; k++) {
+                anchor[k].onclick = doAction;
+                // console.log(anchor[k]);
+            }
+        }
+    }
+
+    function doAction(event) {
+        console.log(event);
+        return false;
+    }
+
+    documentReady(function() {
+        var ajaxStart = (function(block) {
+            var travelmonitor = document.getElementById('travelmonitor');
+
+            init_anchor();
+            get();
+        });
+
+        ajaxStart();
+    });
+
 </script>
 
-<div class="monitor" id="travelmonitor">
-    <?php echo $travellist->getall("<div class='result_row'><span class='date'>Дата: %s</span> <div class='name'>ФИО: %s %s</div> <div>Количество мест: => %s</div><div class='links'><a href='./?action=edit&id=%s'>изменить</a> <a href='./?action=del&id=%5\$s'>удалить</a></div></div>", "date", "name", "soname", "quantity", "id"); ?>
-</div>
+<div class="monitor" id="travelmonitor" data-id="<?php echo $travellist->getSize(); ?>"><?php echo $travellist->getall("<div class='result_row'><span class='date'>Дата: %s</span> <div class='name'>ФИО: %s %s</div> <div>Количество мест: => %s</div><div class='links'><a href='./?action=edit&id=%s'>изменить</a> <a href='./?action=del&id=%5\$s'>удалить</a></div></div>", "date", "name", "soname", "quantity", "id"); ?></div>
 
 
 <h1>Добавить продукт</h1>
-<form action="./index.php?action=add" method="POST" id="travelform" onsubmit="return onSubmit();">
+<form action="./index.php?action=add" method="POST" id="travelform" onsubmit="return onSubmit('add', this);">
 
     <div class="form_row">
         <label>Дата</label>
