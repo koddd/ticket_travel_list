@@ -39,7 +39,6 @@ class travel_list {
                 $this->xml = simplexml_load_file($this->filename);
             } else {
                 $this->xml = new SimpleXMLElement("<root></root>");
-                // echo $this->xml->asXML();
                 // throw new Exception("Отсутствует файл ".$this->filename);
             }
         } catch (Exception $e) {
@@ -104,15 +103,6 @@ class travel_list {
         }
 
         return (object) $result;
-    }
-
-    public function getallXML() {
-        $result = $this->xml->xpath('//root/'.$this->group);
-        while(list( , $node) = each($result)) {
-            echo $node->asXML();
-        }
-
-        // return $result->asXML();
     }
 
     public function display_wraper($before = '', $after = '') {
@@ -278,6 +268,7 @@ if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUE
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if(isset($_GET['action'])) {
+        $success = false;
         switch ($_GET['action']) {
             case "add":
                 $item = array(
@@ -288,6 +279,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 );
 
                 $travellist->addItem($item);
+                $success = true;
                 break;
             case "edit":
                 $item_update = array(
@@ -298,10 +290,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 );
 
                 $travellist->updEntry($id, $item_update);
+                $success = true;
                 break;
             case "del":
                 $travellist->delete($id);
+                $success = true;
                 break;
+        }
+
+        if($success) {
+            header("Location: ./");
         }
     }
 }
@@ -367,6 +365,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         xmlhttp.send(null);
     }
 
+    // Clear form values after submit
     function clearVars(items) {
         for(var varname in items) {
             var element = document.getElementsByName(varname)[0];
