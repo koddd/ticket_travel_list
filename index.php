@@ -404,7 +404,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 case "add":
                     if(event.status == 1) {
                         clearVars(event.vars);
-                        alert('Запись добавлена');
+                        // alert('Запись добавлена');
                     }
                     break;
                 case "edit":
@@ -417,7 +417,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         document.getElementById("hidden_id").parentNode.removeChild(document.getElementById("hidden_id"));
 
                         clearVars(event.vars);
-                        alert('Запись изменена');
+                        // alert('Запись изменена');
                     }
                     break;
             }
